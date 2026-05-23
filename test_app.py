@@ -44,6 +44,12 @@ def test_get_order_returns_created_one():
     assert resp.json()["id"] == created["id"]
 
 
+def test_get_order_404_when_missing():
+    resp = client.get("/orders/does-not-exist")
+    assert resp.status_code == 404
+    assert resp.json() == {"detail": "order not found"}
+
+
 def test_list_orders_includes_created():
     client.post(
         "/orders",
