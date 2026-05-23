@@ -30,6 +30,30 @@ def test_create_order_happy_path():
     assert body["id"].startswith("ord-")
 
 
+def test_create_order_rejects_negative_amount():
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-bad-amount",
+            "items": [{"sku": "A", "qty": 1, "price": 9.9}],
+            "amount": -1,
+        },
+    )
+    assert 400 <= resp.status_code < 500
+
+
+def test_create_order_rejects_zero_item_price():
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-bad-price",
+            "items": [{"sku": "A", "qty": 1, "price": 0}],
+            "amount": 1,
+        },
+    )
+    assert 400 <= resp.status_code < 500
+
+
 def test_get_order_returns_created_one():
     created = client.post(
         "/orders",
