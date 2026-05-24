@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from itertools import islice
 
 from models import Coupon, CouponCreate, Order, OrderCreate, OrderStatus
 
@@ -28,8 +29,12 @@ def get_order(order_id: str) -> Order | None:
     return _orders.get(order_id)
 
 
-def list_orders() -> list[Order]:
-    return list(_orders.values())
+def list_orders(limit: int = 20, offset: int = 0) -> list[Order]:
+    return list(islice(_orders.values(), offset, offset + limit))
+
+
+def count_orders() -> int:
+    return len(_orders)
 
 
 def update_order_status(order_id: str, status: OrderStatus) -> Order:

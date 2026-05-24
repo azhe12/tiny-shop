@@ -31,6 +31,13 @@ class Order(BaseModel):
     created_at: datetime
 
 
+class OrderList(BaseModel):
+    items: list[Order]
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1, le=100)
+    offset: int = Field(ge=0)
+
+
 class OrderCreate(BaseModel):
     customer_id: str
     items: list[OrderItem] = Field(min_length=1)
