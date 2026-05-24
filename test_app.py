@@ -6,11 +6,19 @@ Those gaps exist so Linear tickets can drive the agent to add them.
 """
 from datetime import datetime, timedelta
 
+import pytest
 from fastapi.testclient import TestClient
 
-from app import app
+from app import app, order_rate_limiter
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def reset_order_rate_limiter():
+    order_rate_limiter.configure(max_requests=60, window_seconds=60)
+    yield
+    order_rate_limiter.reset()
 
 
 def test_create_order_happy_path():
@@ -28,6 +36,33 @@ def test_create_order_happy_path():
     assert body["amount"] == 19.8
     assert body["status"] == "PENDING"
     assert body["id"].startswith("ord-")
+
+
+def test_create_order_rate_limit_returns_429():
+    order_rate_limiter.configure(max_requests=2, window_seconds=60)
+
+    for index in range(2):
+        resp = client.post(
+            "/orders",
+            json={
+                "customer_id": f"limited-{index}",
+                "items": [{"sku": "A", "qty": 1, "price": 9.9}],
+                "amount": 9.9,
+            },
+        )
+        assert resp.status_code == 200
+
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "limited-over",
+            "items": [{"sku": "A", "qty": 1, "price": 9.9}],
+            "amount": 9.9,
+        },
+    )
+
+    assert resp.status_code == 429
+    assert resp.json()["detail"] == "too many order requests"
 
 
 def test_get_order_returns_created_one():
