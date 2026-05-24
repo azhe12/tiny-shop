@@ -100,7 +100,45 @@ def test_list_orders_includes_created():
     )
     resp = client.get("/orders")
     assert resp.status_code == 200
-    assert any(o["customer_id"] == "u-003" for o in resp.json())
+    body = resp.json()
+    assert body["total"] == len(storage._orders)
+    assert body["limit"] == 20
+    assert body["offset"] == 0
+    assert any(o["customer_id"] == "u-003" for o in body["items"])
+
+
+def test_list_orders_paginates_with_limit_and_offset():
+    before_count = len(storage._orders)
+    created_customers = ["u-page-001", "u-page-002", "u-page-003"]
+    for customer_id in created_customers:
+        client.post(
+            "/orders",
+            json={
+                "customer_id": customer_id,
+                "items": [{"sku": "P", "qty": 1, "price": 10.0}],
+                "amount": 10.0,
+            },
+        )
+
+    resp = client.get(f"/orders?limit=2&offset={before_count + 1}")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == before_count + len(created_customers)
+    assert body["limit"] == 2
+    assert body["offset"] == before_count + 1
+    assert [order["customer_id"] for order in body["items"]] == [
+        "u-page-002",
+        "u-page-003",
+    ]
+
+
+def test_list_orders_rejects_invalid_limit():
+    low = client.get("/orders?limit=0")
+    high = client.get("/orders?limit=101")
+
+    assert low.status_code == 422
+    assert high.status_code == 422
 
 
 def test_cancel_pending_order_succeeds():
