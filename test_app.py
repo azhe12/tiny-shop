@@ -8,7 +8,9 @@ from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
+import storage
 from app import app
+from models import OrderStatus
 
 client = TestClient(app)
 
@@ -70,6 +72,40 @@ def test_cancel_pending_order_succeeds():
     resp = client.post(f"/orders/{created['id']}/cancel")
     assert resp.status_code == 200
     assert resp.json()["status"] == "CANCELLED"
+
+
+def test_cancel_paid_order_succeeds():
+    created = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-005",
+            "items": [{"sku": "E", "qty": 1, "price": 25.0}],
+            "amount": 25.0,
+        },
+    ).json()
+    storage.update_order_status(created["id"], OrderStatus.PAID)
+
+    resp = client.post(f"/orders/{created['id']}/cancel")
+
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "CANCELLED"
+
+
+def test_cancel_shipped_order_returns_400():
+    created = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-006",
+            "items": [{"sku": "F", "qty": 1, "price": 35.0}],
+            "amount": 35.0,
+        },
+    ).json()
+    storage.update_order_status(created["id"], OrderStatus.SHIPPED)
+
+    resp = client.post(f"/orders/{created['id']}/cancel")
+
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "cannot cancel order in status SHIPPED"
 
 
 def test_create_coupon_happy_path():
