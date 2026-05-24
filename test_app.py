@@ -8,7 +8,9 @@ from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
+import storage
 from app import app
+from models import Coupon
 
 client = TestClient(app)
 
@@ -85,6 +87,63 @@ def test_create_coupon_happy_path():
     body = resp.json()
     assert body["code"] == "SAVE10"
     assert body["is_active"] is True
+
+
+def test_create_order_404_when_coupon_missing():
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-missing-coupon",
+            "items": [{"sku": "X", "qty": 1, "price": 10.0}],
+            "amount": 10.0,
+            "coupon_code": "ORDER-NO-SUCH-COUPON",
+        },
+    )
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "coupon not found"
+
+
+def test_create_order_400_when_coupon_expired():
+    client.post(
+        "/coupons",
+        json={
+            "code": "ORDER-EXPIRED",
+            "discount": 0.1,
+            "expires_at": (datetime.utcnow() - timedelta(days=1)).isoformat(),
+        },
+    )
+
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-expired-coupon",
+            "items": [{"sku": "Y", "qty": 1, "price": 15.0}],
+            "amount": 15.0,
+            "coupon_code": "ORDER-EXPIRED",
+        },
+    )
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "coupon expired"
+
+
+def test_create_order_400_when_coupon_inactive():
+    storage._coupons["ORDER-INACTIVE"] = Coupon(
+        code="ORDER-INACTIVE",
+        discount=0.1,
+        is_active=False,
+    )
+
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-inactive-coupon",
+            "items": [{"sku": "Z", "qty": 1, "price": 20.0}],
+            "amount": 20.0,
+            "coupon_code": "ORDER-INACTIVE",
+        },
+    )
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "coupon inactive"
 
 
 def test_get_coupon_returns_created_one():

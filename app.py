@@ -6,6 +6,8 @@ fix via Linear tickets.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import FastAPI, HTTPException
 
 import storage
@@ -16,6 +18,22 @@ app = FastAPI(title="tiny-shop", version="0.1.0")
 
 @app.post("/orders", response_model=Order)
 def create_order(payload: OrderCreate) -> Order:
+    if payload.coupon_code is not None:
+        coupon = storage.get_coupon(payload.coupon_code)
+        if coupon is None:
+            raise HTTPException(status_code=404, detail="coupon not found")
+        if not coupon.is_active:
+            raise HTTPException(status_code=400, detail="coupon inactive")
+        if coupon.expires_at is not None:
+            if (
+                coupon.expires_at.tzinfo is None
+                or coupon.expires_at.utcoffset() is None
+            ):
+                now = datetime.now(timezone.utc).replace(tzinfo=None)
+            else:
+                now = datetime.now(tz=coupon.expires_at.tzinfo)
+            if coupon.expires_at <= now:
+                raise HTTPException(status_code=400, detail="coupon expired")
     return storage.create_order(payload)
 
 
