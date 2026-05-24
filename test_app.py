@@ -9,9 +9,14 @@ from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
 
 import storage
-from app import app
+from app import ORDER_RATE_LIMIT, app, order_limiter
 
 client = TestClient(app)
+
+
+def setup_function():
+    order_limiter.reset()
+    app.state.order_rate_limit = ORDER_RATE_LIMIT
 
 
 def test_create_order_happy_path():
@@ -67,6 +72,38 @@ def test_create_order_without_idempotency_key_still_creates_new_orders():
     assert second.status_code == 200
     assert first.json()["id"] != second.json()["id"]
     assert len(storage._orders) == before_count + 2
+
+
+def test_create_order_rate_limit_returns_429_for_same_customer():
+    app.state.order_rate_limit = "2/minute"
+    payload = {
+        "customer_id": "u-rate-limited",
+        "items": [{"sku": "A", "qty": 1, "price": 9.9}],
+        "amount": 9.9,
+    }
+
+    first = client.post("/orders", json=payload)
+    second = client.post("/orders", json=payload)
+    third = client.post("/orders", json=payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert third.status_code == 429
+    assert "Rate limit exceeded" in third.json()["error"]
+
+
+def test_create_order_rate_limit_is_scoped_by_customer_id():
+    app.state.order_rate_limit = "1/minute"
+    payload = {
+        "customer_id": "u-rate-limit-a",
+        "items": [{"sku": "A", "qty": 1, "price": 9.9}],
+        "amount": 9.9,
+    }
+    other_customer_payload = payload | {"customer_id": "u-rate-limit-b"}
+
+    assert client.post("/orders", json=payload).status_code == 200
+    assert client.post("/orders", json=payload).status_code == 429
+    assert client.post("/orders", json=other_customer_payload).status_code == 200
 
 
 def test_get_order_returns_created_one():

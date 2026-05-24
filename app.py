@@ -6,16 +6,61 @@ fix via Linear tickets.
 """
 from __future__ import annotations
 
-from fastapi import FastAPI, Header, HTTPException
+from functools import wraps
+from typing import Callable, TypeVar, cast
+
+from fastapi import FastAPI, Header, HTTPException, Request
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 import storage
 from models import Coupon, CouponCreate, Order, OrderCreate, OrderStatus
 
+ORDER_RATE_LIMIT = "100/minute"
+_ORDER_RATE_LIMIT_CUSTOMER_ATTR = "order_rate_limit_customer_id"
+
+_CreateOrderCallable = TypeVar("_CreateOrderCallable", bound=Callable[..., Order])
+
 app = FastAPI(title="tiny-shop", version="0.1.0")
+order_limiter = Limiter(key_func=lambda request: "unknown")
+app.state.limiter = order_limiter
+app.state.order_rate_limit = ORDER_RATE_LIMIT
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+def get_order_rate_limit() -> str:
+    return app.state.order_rate_limit
+
+
+def get_order_customer_id(request: Request) -> str:
+    customer_id = getattr(request.state, _ORDER_RATE_LIMIT_CUSTOMER_ATTR, None)
+    return f"customer:{customer_id}" if customer_id else "customer:unknown"
+
+
+def bind_order_rate_limit_customer(func: _CreateOrderCallable) -> _CreateOrderCallable:
+    @wraps(func)
+    def wrapper(*args: object, **kwargs: object) -> Order:
+        request = kwargs.get("request")
+        payload = kwargs.get("payload")
+
+        if request is None:
+            request = next((arg for arg in args if isinstance(arg, Request)), None)
+        if payload is None:
+            payload = next((arg for arg in args if isinstance(arg, OrderCreate)), None)
+
+        if isinstance(request, Request) and isinstance(payload, OrderCreate):
+            setattr(request.state, _ORDER_RATE_LIMIT_CUSTOMER_ATTR, payload.customer_id)
+
+        return func(*args, **kwargs)
+
+    return cast(_CreateOrderCallable, wrapper)
 
 
 @app.post("/orders", response_model=Order)
+@bind_order_rate_limit_customer
+@order_limiter.limit(get_order_rate_limit, key_func=get_order_customer_id)
 def create_order(
+    request: Request,
     payload: OrderCreate,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> Order:
