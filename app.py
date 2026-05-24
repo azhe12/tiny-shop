@@ -6,7 +6,7 @@ fix via Linear tickets.
 """
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 
 import storage
 from models import Coupon, CouponCreate, Order, OrderCreate, OrderStatus
@@ -15,8 +15,11 @@ app = FastAPI(title="tiny-shop", version="0.1.0")
 
 
 @app.post("/orders", response_model=Order)
-def create_order(payload: OrderCreate) -> Order:
-    return storage.create_order(payload)
+def create_order(
+    payload: OrderCreate,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> Order:
+    return storage.create_order(payload, idempotency_key=idempotency_key)
 
 
 @app.get("/orders/{order_id}", response_model=Order)

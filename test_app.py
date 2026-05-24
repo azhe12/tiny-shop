@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
+import storage
 from app import app
 
 client = TestClient(app)
@@ -28,6 +29,44 @@ def test_create_order_happy_path():
     assert body["amount"] == 19.8
     assert body["status"] == "PENDING"
     assert body["id"].startswith("ord-")
+
+
+def test_create_order_with_idempotency_key_returns_existing_order_without_insert():
+    payload = {
+        "customer_id": "u-idempotent",
+        "items": [{"sku": "A", "qty": 2, "price": 9.9}],
+        "amount": 19.8,
+    }
+    headers = {"Idempotency-Key": "retry-create-order-u-idempotent"}
+    before_count = len(storage._orders)
+
+    first = client.post("/orders", json=payload, headers=headers)
+    assert first.status_code == 200
+    after_first_count = len(storage._orders)
+
+    second = client.post("/orders", json=payload, headers=headers)
+    assert second.status_code == 200
+
+    assert after_first_count == before_count + 1
+    assert second.json() == first.json()
+    assert len(storage._orders) == after_first_count
+
+
+def test_create_order_without_idempotency_key_still_creates_new_orders():
+    payload = {
+        "customer_id": "u-no-idempotency",
+        "items": [{"sku": "A", "qty": 1, "price": 9.9}],
+        "amount": 9.9,
+    }
+    before_count = len(storage._orders)
+
+    first = client.post("/orders", json=payload)
+    second = client.post("/orders", json=payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["id"] != second.json()["id"]
+    assert len(storage._orders) == before_count + 2
 
 
 def test_get_order_returns_created_one():
