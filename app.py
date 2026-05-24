@@ -25,6 +25,8 @@ def create_order(
 @app.get("/orders/{order_id}", response_model=Order)
 def get_order(order_id: str) -> Order:
     order = storage.get_order(order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
     return order.model_copy()
 
 
