@@ -28,6 +28,7 @@ class Order(BaseModel):
     amount: float = Field(gt=0)
     status: OrderStatus = OrderStatus.PENDING
     coupon_code: str | None = None
+    remark: str | None = None
     created_at: datetime
 
 
@@ -36,6 +37,7 @@ class OrderCreate(BaseModel):
     items: list[OrderItem] = Field(min_length=1)
     amount: float = Field(gt=0)
     coupon_code: str | None = None
+    remark: str | None = None
 
 
 class Coupon(BaseModel):
