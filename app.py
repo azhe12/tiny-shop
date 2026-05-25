@@ -6,6 +6,8 @@ fix via Linear tickets.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import FastAPI, Header, HTTPException
 
 import storage
@@ -48,6 +50,15 @@ def cancel_order(order_id: str) -> Order:
 
 @app.post("/coupons", response_model=Coupon)
 def create_coupon(payload: CouponCreate) -> Coupon:
+    if payload.expires_at is not None:
+        now = datetime.now(timezone.utc)
+        if payload.expires_at.tzinfo is None:
+            now = now.replace(tzinfo=None)
+        if payload.expires_at <= now:
+            raise HTTPException(
+                status_code=400,
+                detail="coupon expires_at must be in the future",
+            )
     return storage.create_coupon(payload)
 
 
