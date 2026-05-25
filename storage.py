@@ -8,9 +8,15 @@ from models import Coupon, CouponCreate, Order, OrderCreate, OrderStatus
 
 _orders: dict[str, Order] = {}
 _coupons: dict[str, Coupon] = {}
+_order_idempotency_keys: dict[str, str] = {}
 
 
-def create_order(payload: OrderCreate) -> Order:
+def create_order(payload: OrderCreate, idempotency_key: str | None = None) -> Order:
+    if idempotency_key is not None:
+        existing_order_id = _order_idempotency_keys.get(idempotency_key)
+        if existing_order_id is not None:
+            return _orders[existing_order_id]
+
     order_id = f"ord-{uuid.uuid4().hex[:12]}"
     order = Order(
         id=order_id,
@@ -21,6 +27,8 @@ def create_order(payload: OrderCreate) -> Order:
         created_at=datetime.utcnow(),
     )
     _orders[order_id] = order
+    if idempotency_key is not None:
+        _order_idempotency_keys[idempotency_key] = order_id
     return order
 
 
@@ -42,7 +50,7 @@ def update_order_status(order_id: str, status: OrderStatus) -> Order:
 def create_coupon(payload: CouponCreate) -> Coupon:
     coupon = Coupon(
         code=payload.code,
-        discount=payload.discount,
+        discount_percent=payload.discount_percent,
         expires_at=payload.expires_at,
     )
     _coupons[coupon.code] = coupon

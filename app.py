@@ -6,7 +6,7 @@ fix via Linear tickets.
 """
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 
 import storage
 from models import Coupon, CouponCreate, Order, OrderCreate, OrderStatus
@@ -15,13 +15,18 @@ app = FastAPI(title="tiny-shop", version="0.1.0")
 
 
 @app.post("/orders", response_model=Order)
-def create_order(payload: OrderCreate) -> Order:
-    return storage.create_order(payload)
+def create_order(
+    payload: OrderCreate,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> Order:
+    return storage.create_order(payload, idempotency_key=idempotency_key)
 
 
 @app.get("/orders/{order_id}", response_model=Order)
 def get_order(order_id: str) -> Order:
     order = storage.get_order(order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
     return order.model_copy()
 
 
@@ -33,10 +38,10 @@ def list_orders() -> list[Order]:
 @app.post("/orders/{order_id}/cancel", response_model=Order)
 def cancel_order(order_id: str) -> Order:
     order = storage.get_order(order_id)
-    if order is not None and order.status == OrderStatus.SHIPPED:
+    if order is not None and order.status not in {OrderStatus.PENDING, OrderStatus.PAID}:
         raise HTTPException(
             status_code=400,
-            detail=f"cannot cancel order in status {OrderStatus.SHIPPED.value}",
+            detail=f"cannot cancel order in status {order.status.value}",
         )
     return storage.update_order_status(order_id, OrderStatus.CANCELLED)
 
