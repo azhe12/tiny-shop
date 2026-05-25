@@ -40,6 +40,19 @@ def cancel_order(order_id: str) -> Order:
     return storage.update_order_status(order_id, OrderStatus.CANCELLED)
 
 
+@app.post("/orders/{order_id}/ship", response_model=Order)
+def ship_order(order_id: str) -> Order:
+    order = storage.get_order(order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
+    if order.status != OrderStatus.PAID:
+        raise HTTPException(
+            status_code=400,
+            detail=f"cannot ship order in status {order.status.value}",
+        )
+    return storage.update_order_status(order_id, OrderStatus.SHIPPED)
+
+
 @app.post("/coupons", response_model=Coupon)
 def create_coupon(payload: CouponCreate) -> Coupon:
     return storage.create_coupon(payload)
