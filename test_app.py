@@ -169,6 +169,21 @@ def test_create_coupon_happy_path():
     assert body["is_active"] is True
 
 
+def test_create_coupon_normalizes_code_before_storage():
+    resp = client.post(
+        "/coupons",
+        json={
+            "code": " summer10 ",
+            "discount_percent": 10,
+        },
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["code"] == "SUMMER10"
+    assert "SUMMER10" in storage._coupons
+    assert " summer10 " not in storage._coupons
+
+
 def test_create_coupon_rejects_discount_percent_below_minimum():
     resp = client.post("/coupons", json={"code": "SAVE0", "discount_percent": 0})
 
@@ -200,6 +215,43 @@ def test_get_coupon_returns_created_one():
     resp = client.get("/coupons/WELCOME")
     assert resp.status_code == 200
     assert resp.json()["discount_percent"] == 20
+
+
+def test_get_coupon_matches_case_insensitive_code():
+    client.post("/coupons", json={"code": "WINTER20", "discount_percent": 20})
+
+    resp = client.get("/coupons/winter20")
+
+    assert resp.status_code == 200
+    assert resp.json()["code"] == "WINTER20"
+
+
+def test_get_coupon_matches_code_with_surrounding_spaces():
+    client.post("/coupons", json={"code": "SPRING15", "discount_percent": 15})
+
+    resp = client.get("/coupons/%20SPRING15%20")
+
+    assert resp.status_code == 200
+    assert resp.json()["code"] == "SPRING15"
+
+
+def test_create_order_normalizes_coupon_code_before_storage():
+    client.post("/coupons", json={"code": "ORDER10", "discount_percent": 10})
+
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-coupon-normalized",
+            "items": [{"sku": "A", "qty": 1, "price": 10.0}],
+            "amount": 10.0,
+            "coupon_code": " order10 ",
+        },
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["coupon_code"] == "ORDER10"
+    assert storage._orders[body["id"]].coupon_code == "ORDER10"
 
 
 def test_get_coupon_404_when_missing():
