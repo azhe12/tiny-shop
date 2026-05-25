@@ -228,6 +228,59 @@ def test_cancel_cancelled_order_returns_400():
     assert resp.json()["detail"] == "cannot cancel order in status CANCELLED"
 
 
+def test_refund_paid_order_records_user_remark():
+    created = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-refund",
+            "items": [{"sku": "R", "qty": 1, "price": 49.0}],
+            "amount": 49.0,
+        },
+    ).json()
+    storage.update_order_status(created["id"], OrderStatus.PAID)
+    remark = "Customer requested refund after duplicate purchase."
+
+    resp = client.post(f"/orders/{created['id']}/refund", json={"remark": remark})
+
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "REFUNDED"
+    assert resp.json()["refund_remark"] == remark
+
+    fetched = client.get(f"/orders/{created['id']}")
+    assert fetched.status_code == 200
+    assert fetched.json()["refund_remark"] == remark
+
+
+def test_refund_pending_order_returns_400():
+    created = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-refund-pending",
+            "items": [{"sku": "R", "qty": 1, "price": 49.0}],
+            "amount": 49.0,
+        },
+    ).json()
+
+    resp = client.post(
+        f"/orders/{created['id']}/refund",
+        json={"remark": "Please refund before payment."},
+    )
+
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "cannot refund order in status PENDING"
+    assert client.get(f"/orders/{created['id']}").json()["refund_remark"] is None
+
+
+def test_refund_missing_order_returns_404():
+    resp = client.post(
+        "/orders/does-not-exist/refund",
+        json={"remark": "Customer submitted a refund request."},
+    )
+
+    assert resp.status_code == 404
+    assert resp.json() == {"detail": "order not found"}
+
+
 def test_create_coupon_happy_path():
     resp = client.post(
         "/coupons",

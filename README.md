@@ -29,3 +29,16 @@ uvicorn app:app --reload
 ```
 
 Then open <http://localhost:8000/docs> for the auto-generated Swagger UI.
+
+## Refund an order
+
+Paid, shipped, and delivered orders can be refunded with an optional user
+remark:
+
+```bash
+curl -X POST http://localhost:8000/orders/ord-example/refund \
+  -H "Content-Type: application/json" \
+  -d '{"remark": "Customer requested refund after duplicate purchase."}'
+```
+
+The response includes `status: "REFUNDED"` and the stored `refund_remark`.

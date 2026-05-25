@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Header, HTTPException
 
 import storage
-from models import Coupon, CouponCreate, Order, OrderCreate, OrderStatus
+from models import Coupon, CouponCreate, Order, OrderCreate, OrderRefund, OrderStatus
 
 app = FastAPI(title="tiny-shop", version="0.1.0")
 
@@ -46,6 +46,23 @@ def cancel_order(order_id: str) -> Order:
             detail=f"cannot cancel order in status {order.status.value}",
         )
     return storage.update_order_status(order_id, OrderStatus.CANCELLED)
+
+
+@app.post("/orders/{order_id}/refund", response_model=Order)
+def refund_order(order_id: str, payload: OrderRefund) -> Order:
+    order = storage.get_order(order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
+    if order.status not in {
+        OrderStatus.PAID,
+        OrderStatus.SHIPPED,
+        OrderStatus.DELIVERED,
+    }:
+        raise HTTPException(
+            status_code=400,
+            detail=f"cannot refund order in status {order.status.value}",
+        )
+    return storage.refund_order(order_id, remark=payload.remark)
 
 
 @app.post("/coupons", response_model=Coupon)
