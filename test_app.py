@@ -32,6 +32,43 @@ def test_create_order_happy_path():
     assert body["id"].startswith("ord-")
 
 
+def test_create_order_rounds_discount_precision_noise_to_cents():
+    subtotal = 111.1111111
+    discount_percent = 10
+    discounted_amount = subtotal * (1 - discount_percent / 100)
+    assert discounted_amount == 99.99999999
+
+    coupon = client.post(
+        "/coupons",
+        json={"code": "ROUND10", "discount_percent": discount_percent},
+    )
+    assert coupon.status_code == 200
+
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-rounding",
+            "items": [{"sku": "ROUND", "qty": 1, "price": subtotal}],
+            "amount": discounted_amount,
+            "coupon_code": "ROUND10",
+        },
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["amount"] == 100.0
+    assert storage._orders[body["id"]].amount == 100.0
+
+    get_resp = client.get(f"/orders/{body['id']}")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["amount"] == 100.0
+
+    list_resp = client.get("/orders")
+    assert list_resp.status_code == 200
+    listed_order = next(order for order in list_resp.json() if order["id"] == body["id"])
+    assert listed_order["amount"] == 100.0
+
+
 def test_create_order_rejects_negative_amount():
     resp = client.post(
         "/orders",
