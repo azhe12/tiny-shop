@@ -32,6 +32,26 @@ def test_create_order_happy_path():
     assert body["id"].startswith("ord-")
 
 
+def test_openapi_routes_have_tags_and_summaries():
+    resp = client.get("/openapi.json")
+
+    assert resp.status_code == 200
+    paths = resp.json()["paths"]
+    expected_tags = {
+        ("/orders", "post"): ["Orders"],
+        ("/orders", "get"): ["Orders"],
+        ("/orders/{order_id}", "get"): ["Orders"],
+        ("/orders/{order_id}/cancel", "post"): ["Orders"],
+        ("/coupons", "post"): ["Coupons"],
+        ("/coupons/{code}", "get"): ["Coupons"],
+    }
+
+    for (path, method), tags in expected_tags.items():
+        operation = paths[path][method]
+        assert operation["tags"] == tags
+        assert operation["summary"]
+
+
 def test_create_order_rejects_negative_amount():
     resp = client.post(
         "/orders",
