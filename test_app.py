@@ -31,6 +31,34 @@ def test_create_order_happy_path():
     assert body["id"].startswith("ord-")
 
 
+def test_create_order_with_coupon_applies_discount_to_response_and_storage():
+    coupon_code = "SAVE20-ORDER"
+    coupon = client.post(
+        "/coupons",
+        json={
+            "code": coupon_code,
+            "discount_percent": 20,
+            "expires_at": (datetime.utcnow() + timedelta(days=30)).isoformat(),
+        },
+    )
+    assert coupon.status_code == 200
+
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-discount",
+            "items": [{"sku": "A", "qty": 1, "price": 100.0}],
+            "amount": 100.0,
+            "coupon_code": coupon_code,
+        },
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["amount"] == 80.0
+    assert storage._orders[body["id"]].amount == 80.0
+
+
 def test_create_order_with_idempotency_key_returns_existing_order_without_insert():
     payload = {
         "customer_id": "u-idempotent",
