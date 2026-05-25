@@ -36,8 +36,11 @@ def get_order(order_id: str) -> Order | None:
     return _orders.get(order_id)
 
 
-def list_orders() -> list[Order]:
-    return list(_orders.values())
+def list_orders(status: OrderStatus | None = None) -> list[Order]:
+    orders = list(_orders.values())
+    if status is None:
+        return orders
+    return [order for order in orders if order.status == status]
 
 
 def update_order_status(order_id: str, status: OrderStatus) -> Order:

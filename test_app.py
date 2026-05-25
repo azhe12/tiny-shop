@@ -103,6 +103,40 @@ def test_list_orders_includes_created():
     assert any(o["customer_id"] == "u-003" for o in resp.json())
 
 
+def test_list_orders_filters_by_status():
+    pending = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-filter-pending",
+            "items": [{"sku": "P", "qty": 1, "price": 12.0}],
+            "amount": 12.0,
+        },
+    ).json()
+    cancelled = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-filter-cancelled",
+            "items": [{"sku": "X", "qty": 1, "price": 8.0}],
+            "amount": 8.0,
+        },
+    ).json()
+    client.post(f"/orders/{cancelled['id']}/cancel")
+
+    resp = client.get("/orders?status=PENDING")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert pending["id"] in {order["id"] for order in body}
+    assert cancelled["id"] not in {order["id"] for order in body}
+    assert all(order["status"] == "PENDING" for order in body)
+
+
+def test_list_orders_rejects_invalid_status():
+    resp = client.get("/orders?status=NOT_A_STATUS")
+
+    assert resp.status_code == 422
+
+
 def test_cancel_pending_order_succeeds():
     created = client.post(
         "/orders",
