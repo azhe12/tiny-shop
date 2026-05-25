@@ -122,21 +122,48 @@ def test_create_coupon_happy_path():
         "/coupons",
         json={
             "code": "SAVE10",
-            "discount": 0.1,
+            "discount_percent": 10,
             "expires_at": (datetime.utcnow() + timedelta(days=30)).isoformat(),
         },
     )
     assert resp.status_code == 200
     body = resp.json()
     assert body["code"] == "SAVE10"
+    assert body["discount_percent"] == 10
     assert body["is_active"] is True
 
 
+def test_create_coupon_rejects_discount_percent_below_minimum():
+    resp = client.post("/coupons", json={"code": "SAVE0", "discount_percent": 0})
+
+    assert 400 <= resp.status_code < 500
+
+
+def test_create_coupon_rejects_discount_percent_above_maximum():
+    resp = client.post("/coupons", json={"code": "SAVE150", "discount_percent": 150})
+
+    assert 400 <= resp.status_code < 500
+
+
+def test_create_coupon_accepts_discount_percent_boundaries():
+    for discount_percent in (1, 100):
+        resp = client.post(
+            "/coupons",
+            json={
+                "code": f"SAVE{discount_percent}",
+                "discount_percent": discount_percent,
+            },
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["discount_percent"] == discount_percent
+
+
 def test_get_coupon_returns_created_one():
-    client.post("/coupons", json={"code": "WELCOME", "discount": 0.2})
+    client.post("/coupons", json={"code": "WELCOME", "discount_percent": 20})
     resp = client.get("/coupons/WELCOME")
     assert resp.status_code == 200
-    assert resp.json()["discount"] == 0.2
+    assert resp.json()["discount_percent"] == 20
 
 
 def test_get_coupon_404_when_missing():

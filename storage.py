@@ -50,7 +50,7 @@ def update_order_status(order_id: str, status: OrderStatus) -> Order:
 def create_coupon(payload: CouponCreate) -> Coupon:
     coupon = Coupon(
         code=payload.code,
-        discount=payload.discount,
+        discount_percent=payload.discount_percent,
         expires_at=payload.expires_at,
     )
     _coupons[coupon.code] = coupon
