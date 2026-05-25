@@ -59,3 +59,10 @@ def create_coupon(payload: CouponCreate) -> Coupon:
 
 def get_coupon(code: str) -> Coupon | None:
     return _coupons.get(code)
+
+
+def delete_coupon(code: str) -> bool:
+    if code not in _coupons:
+        return False
+    del _coupons[code]
+    return True

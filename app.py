@@ -6,7 +6,7 @@ fix via Linear tickets.
 """
 from __future__ import annotations
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Response, status
 
 import storage
 from models import Coupon, CouponCreate, Order, OrderCreate, OrderStatus
@@ -57,3 +57,10 @@ def get_coupon(code: str) -> Coupon:
     if coupon is None:
         raise HTTPException(status_code=404, detail="coupon not found")
     return coupon
+
+
+@app.delete("/coupons/{code}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_coupon(code: str) -> Response:
+    if not storage.delete_coupon(code):
+        raise HTTPException(status_code=404, detail="coupon not found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
