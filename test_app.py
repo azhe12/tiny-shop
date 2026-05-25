@@ -6,10 +6,12 @@ Those gaps exist so Linear tickets can drive the agent to add them.
 """
 from datetime import datetime, timedelta
 
+import pytest
 from fastapi.testclient import TestClient
 
 import storage
 from app import app
+from models import OrderStatus
 
 client = TestClient(app)
 
@@ -115,6 +117,55 @@ def test_cancel_pending_order_succeeds():
     resp = client.post(f"/orders/{created['id']}/cancel")
     assert resp.status_code == 200
     assert resp.json()["status"] == "CANCELLED"
+
+
+def test_ship_paid_order_succeeds():
+    created = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-ship-paid",
+            "items": [{"sku": "SHIP", "qty": 1, "price": 25.0}],
+            "amount": 25.0,
+        },
+    ).json()
+    storage.update_order_status(created["id"], OrderStatus.PAID)
+
+    resp = client.post(f"/orders/{created['id']}/ship")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == created["id"]
+    assert body["status"] == "SHIPPED"
+    assert storage.get_order(created["id"]).status == OrderStatus.SHIPPED
+
+
+@pytest.mark.parametrize(
+    "status",
+    [OrderStatus.PENDING, OrderStatus.CANCELLED, OrderStatus.SHIPPED],
+)
+def test_ship_non_paid_order_is_rejected(status):
+    created = client.post(
+        "/orders",
+        json={
+            "customer_id": f"u-ship-{status.value.lower()}",
+            "items": [{"sku": "SHIP", "qty": 1, "price": 25.0}],
+            "amount": 25.0,
+        },
+    ).json()
+    if status != OrderStatus.PENDING:
+        storage.update_order_status(created["id"], status)
+
+    resp = client.post(f"/orders/{created['id']}/ship")
+
+    assert resp.status_code == 400
+    assert resp.json() == {"detail": f"cannot ship order in status {status.value}"}
+    assert storage.get_order(created["id"]).status == status
+
+
+def test_ship_order_404_when_missing():
+    resp = client.post("/orders/does-not-exist/ship")
+    assert resp.status_code == 404
+    assert resp.json() == {"detail": "order not found"}
 
 
 def test_create_coupon_happy_path():
