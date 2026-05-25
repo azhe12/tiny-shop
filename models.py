@@ -31,6 +31,13 @@ class Order(BaseModel):
     created_at: datetime
 
 
+class OrderListResponse(BaseModel):
+    items: list[Order]
+    total: int
+    limit: int
+    offset: int
+
+
 class OrderCreate(BaseModel):
     customer_id: str
     items: list[OrderItem] = Field(min_length=1)

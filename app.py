@@ -6,10 +6,10 @@ fix via Linear tickets.
 """
 from __future__ import annotations
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Query
 
 import storage
-from models import Coupon, CouponCreate, Order, OrderCreate, OrderStatus
+from models import Coupon, CouponCreate, Order, OrderCreate, OrderListResponse, OrderStatus
 
 app = FastAPI(title="tiny-shop", version="0.1.0")
 
@@ -30,9 +30,17 @@ def get_order(order_id: str) -> Order:
     return order.model_copy()
 
 
-@app.get("/orders", response_model=list[Order])
-def list_orders() -> list[Order]:
-    return storage.list_orders()
+@app.get("/orders", response_model=OrderListResponse)
+def list_orders(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = 0,
+) -> OrderListResponse:
+    return OrderListResponse(
+        items=storage.list_orders(limit=limit, offset=offset),
+        total=storage.count_orders(),
+        limit=limit,
+        offset=offset,
+    )
 
 
 @app.post("/orders/{order_id}/cancel", response_model=Order)
