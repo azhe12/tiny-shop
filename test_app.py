@@ -15,6 +15,15 @@ from models import OrderStatus
 client = TestClient(app)
 
 
+def test_openapi_groups_routes_with_tags():
+    resp = client.get("/openapi.json")
+
+    assert resp.status_code == 200
+    paths = resp.json()["paths"]
+    assert paths["/orders"]["post"]["tags"] == ["Orders"]
+    assert paths["/coupons/{code}"]["get"]["tags"] == ["Coupons"]
+
+
 def test_create_order_happy_path():
     resp = client.post(
         "/orders",
