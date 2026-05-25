@@ -47,6 +47,14 @@ def update_order_status(order_id: str, status: OrderStatus) -> Order:
     return order
 
 
+def refund_order(order_id: str, remark: str | None = None) -> Order:
+    order = _orders[order_id]
+    order.status = OrderStatus.REFUNDED
+    order.refund_remark = remark
+    _orders[order_id] = order
+    return order
+
+
 def create_coupon(payload: CouponCreate) -> Coupon:
     coupon = Coupon(
         code=payload.code,
