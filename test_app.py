@@ -4,7 +4,7 @@ Intentionally does NOT cover the known bugs (no idempotency, no amount
 validation, no state-machine checks, no pagination, no coupon validation).
 Those gaps exist so Linear tickets can drive the agent to add them.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
@@ -208,6 +208,34 @@ def test_create_coupon_happy_path():
     assert body["code"] == "SAVE10"
     assert body["discount_percent"] == 10
     assert body["is_active"] is True
+
+
+def test_create_coupon_rejects_past_expires_at():
+    resp = client.post(
+        "/coupons",
+        json={
+            "code": "EXPIRED",
+            "discount_percent": 10,
+            "expires_at": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+        },
+    )
+
+    assert resp.status_code == 400
+    assert resp.json() == {"detail": "coupon expires_at must be in the future"}
+
+
+def test_create_coupon_accepts_future_expires_at():
+    resp = client.post(
+        "/coupons",
+        json={
+            "code": "SOON",
+            "discount_percent": 10,
+            "expires_at": (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat(),
+        },
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["code"] == "SOON"
 
 
 def test_create_coupon_rejects_discount_percent_below_minimum():
