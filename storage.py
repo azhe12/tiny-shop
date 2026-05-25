@@ -11,19 +11,28 @@ _coupons: dict[str, Coupon] = {}
 _order_idempotency_keys: dict[str, str] = {}
 
 
+def _normalize_coupon_code(code: str) -> str:
+    return code.strip().upper()
+
+
 def create_order(payload: OrderCreate, idempotency_key: str | None = None) -> Order:
     if idempotency_key is not None:
         existing_order_id = _order_idempotency_keys.get(idempotency_key)
         if existing_order_id is not None:
             return _orders[existing_order_id]
 
+    coupon_code = (
+        _normalize_coupon_code(payload.coupon_code)
+        if payload.coupon_code is not None
+        else None
+    )
     order_id = f"ord-{uuid.uuid4().hex[:12]}"
     order = Order(
         id=order_id,
         customer_id=payload.customer_id,
         items=payload.items,
         amount=payload.amount,
-        coupon_code=payload.coupon_code,
+        coupon_code=coupon_code,
         created_at=datetime.utcnow(),
     )
     _orders[order_id] = order
@@ -49,7 +58,7 @@ def update_order_status(order_id: str, status: OrderStatus) -> Order:
 
 def create_coupon(payload: CouponCreate) -> Coupon:
     coupon = Coupon(
-        code=payload.code,
+        code=_normalize_coupon_code(payload.code),
         discount_percent=payload.discount_percent,
         expires_at=payload.expires_at,
     )
@@ -58,4 +67,4 @@ def create_coupon(payload: CouponCreate) -> Coupon:
 
 
 def get_coupon(code: str) -> Coupon | None:
-    return _coupons.get(code)
+    return _coupons.get(_normalize_coupon_code(code))
