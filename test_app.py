@@ -4,12 +4,13 @@ Intentionally does NOT cover the known bugs (no idempotency, no amount
 validation, no state-machine checks, no pagination, no coupon validation).
 Those gaps exist so Linear tickets can drive the agent to add them.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
 import storage
 from app import app
+from models import Coupon
 
 client = TestClient(app)
 
@@ -142,3 +143,67 @@ def test_get_coupon_returns_created_one():
 def test_get_coupon_404_when_missing():
     resp = client.get("/coupons/NOPE-DOES-NOT-EXIST")
     assert resp.status_code == 404
+
+
+def test_create_order_404_when_coupon_missing():
+    before_count = len(storage._orders)
+
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-missing-coupon",
+            "items": [{"sku": "A", "qty": 1, "price": 9.9}],
+            "amount": 9.9,
+            "coupon_code": "NO-SUCH-COUPON",
+        },
+    )
+
+    assert resp.status_code == 404
+    assert resp.json() == {"detail": "coupon not found"}
+    assert len(storage._orders) == before_count
+
+
+def test_create_order_400_when_coupon_expired():
+    storage._coupons["EXPIRED"] = Coupon(
+        code="EXPIRED",
+        discount=0.1,
+        expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+    )
+    before_count = len(storage._orders)
+
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-expired-coupon",
+            "items": [{"sku": "A", "qty": 1, "price": 9.9}],
+            "amount": 9.9,
+            "coupon_code": "EXPIRED",
+        },
+    )
+
+    assert resp.status_code == 400
+    assert resp.json() == {"detail": "coupon expired"}
+    assert len(storage._orders) == before_count
+
+
+def test_create_order_400_when_coupon_inactive():
+    storage._coupons["INACTIVE"] = Coupon(
+        code="INACTIVE",
+        discount=0.1,
+        is_active=False,
+    )
+    before_count = len(storage._orders)
+
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-inactive-coupon",
+            "items": [{"sku": "A", "qty": 1, "price": 9.9}],
+            "amount": 9.9,
+            "coupon_code": "INACTIVE",
+        },
+    )
+
+    assert resp.status_code == 400
+    assert resp.json() == {"detail": "coupon inactive"}
+    assert len(storage._orders) == before_count
