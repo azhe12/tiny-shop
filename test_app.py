@@ -128,6 +128,40 @@ def test_list_orders_includes_created():
     assert any(o["customer_id"] == "u-003" for o in resp.json())
 
 
+def test_list_orders_filters_by_customer_id():
+    first = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-filter-match",
+            "items": [{"sku": "C", "qty": 1, "price": 5.0}],
+            "amount": 5.0,
+        },
+    ).json()
+    second = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-filter-other",
+            "items": [{"sku": "D", "qty": 1, "price": 7.0}],
+            "amount": 7.0,
+        },
+    ).json()
+
+    resp = client.get("/orders", params={"customer_id": "u-filter-match"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert any(order["id"] == first["id"] for order in body)
+    assert all(order["customer_id"] == "u-filter-match" for order in body)
+    assert all(order["id"] != second["id"] for order in body)
+
+
+def test_list_orders_returns_empty_for_missing_customer_id():
+    resp = client.get("/orders", params={"customer_id": "u-filter-missing"})
+
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
 def test_cancel_pending_order_succeeds():
     created = client.post(
         "/orders",

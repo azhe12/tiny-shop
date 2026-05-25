@@ -31,8 +31,8 @@ def get_order(order_id: str) -> Order:
 
 
 @app.get("/orders", response_model=list[Order])
-def list_orders() -> list[Order]:
-    return storage.list_orders()
+def list_orders(customer_id: str | None = None) -> list[Order]:
+    return storage.list_orders(customer_id=customer_id)
 
 
 @app.post("/orders/{order_id}/cancel", response_model=Order)
