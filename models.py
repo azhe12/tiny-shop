@@ -40,12 +40,12 @@ class OrderCreate(BaseModel):
 
 class Coupon(BaseModel):
     code: str
-    discount: float
+    discount_percent: int = Field(ge=1, le=100)
     expires_at: datetime | None = None
     is_active: bool = True
 
 
 class CouponCreate(BaseModel):
     code: str
-    discount: float
+    discount_percent: int = Field(ge=1, le=100)
     expires_at: datetime | None = None
