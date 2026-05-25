@@ -17,7 +17,7 @@ class OrderStatus(str, Enum):
 
 class OrderItem(BaseModel):
     sku: str
-    qty: int = Field(gt=0)
+    qty: int = Field(ge=1)
     price: float = Field(gt=0)
 
 

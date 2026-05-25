@@ -56,6 +56,43 @@ def test_create_order_rejects_zero_item_price():
     assert 400 <= resp.status_code < 500
 
 
+def test_create_order_rejects_zero_item_quantity():
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-zero-qty",
+            "items": [{"sku": "A", "qty": 0, "price": 9.9}],
+            "amount": 9.9,
+        },
+    )
+    assert 400 <= resp.status_code < 500
+
+
+def test_create_order_rejects_negative_item_quantity():
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-negative-qty",
+            "items": [{"sku": "A", "qty": -1, "price": 9.9}],
+            "amount": 9.9,
+        },
+    )
+    assert 400 <= resp.status_code < 500
+
+
+def test_create_order_accepts_minimum_item_quantity():
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-min-qty",
+            "items": [{"sku": "A", "qty": 1, "price": 9.9}],
+            "amount": 9.9,
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["items"][0]["qty"] == 1
+
+
 def test_create_order_with_idempotency_key_returns_existing_order_without_insert():
     payload = {
         "customer_id": "u-idempotent",
