@@ -37,6 +37,12 @@ def list_orders() -> list[Order]:
 
 @app.post("/orders/{order_id}/cancel", response_model=Order)
 def cancel_order(order_id: str) -> Order:
+    order = storage.get_order(order_id)
+    if order is not None and order.status not in {OrderStatus.PENDING, OrderStatus.PAID}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"cannot cancel order in status {order.status.value}",
+        )
     return storage.update_order_status(order_id, OrderStatus.CANCELLED)
 
 
