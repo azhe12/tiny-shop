@@ -18,14 +18,14 @@ class OrderStatus(str, Enum):
 class OrderItem(BaseModel):
     sku: str
     qty: int = Field(gt=0)
-    price: float
+    price: float = Field(gt=0)
 
 
 class Order(BaseModel):
     id: str
     customer_id: str
     items: list[OrderItem] = Field(min_length=1)
-    amount: float
+    amount: float = Field(gt=0)
     status: OrderStatus = OrderStatus.PENDING
     coupon_code: str | None = None
     created_at: datetime
@@ -34,7 +34,7 @@ class Order(BaseModel):
 class OrderCreate(BaseModel):
     customer_id: str
     items: list[OrderItem] = Field(min_length=1)
-    amount: float
+    amount: float = Field(gt=0)
     coupon_code: str | None = None
 
 
