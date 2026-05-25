@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 import storage
 from app import app
-from models import OrderStatus
+from models import Coupon, OrderStatus
 
 client = TestClient(app)
 
@@ -208,6 +208,46 @@ def test_create_coupon_happy_path():
     assert body["code"] == "SAVE10"
     assert body["discount_percent"] == 10
     assert body["is_active"] is True
+
+
+def test_create_coupon_stores_new_coupon_when_code_is_unused():
+    code = "SPRING25-TTOP26"
+    storage._coupons.pop(code, None)
+
+    resp = client.post("/coupons", json={"code": code, "discount_percent": 25})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["code"] == code
+    assert body["discount_percent"] == 25
+    assert storage._coupons[code].discount_percent == 25
+
+
+def test_create_coupon_rejects_duplicate_code_without_changing_existing_coupon():
+    code = "DUPLICATE-TTOP26"
+    old_expires_at = datetime.utcnow() + timedelta(days=7)
+    storage._coupons[code] = Coupon(
+        code=code,
+        discount_percent=15,
+        expires_at=old_expires_at,
+        is_active=False,
+    )
+
+    resp = client.post(
+        "/coupons",
+        json={
+            "code": code,
+            "discount_percent": 50,
+            "expires_at": (datetime.utcnow() + timedelta(days=30)).isoformat(),
+        },
+    )
+
+    assert resp.status_code == 409
+    assert resp.json() == {"detail": "coupon code already exists"}
+    stored = storage._coupons[code]
+    assert stored.discount_percent == 15
+    assert stored.expires_at == old_expires_at
+    assert stored.is_active is False
 
 
 def test_create_coupon_rejects_discount_percent_below_minimum():

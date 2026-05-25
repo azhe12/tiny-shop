@@ -48,6 +48,8 @@ def cancel_order(order_id: str) -> Order:
 
 @app.post("/coupons", response_model=Coupon)
 def create_coupon(payload: CouponCreate) -> Coupon:
+    if storage.get_coupon(payload.code) is not None:
+        raise HTTPException(status_code=409, detail="coupon code already exists")
     return storage.create_coupon(payload)
 
 
