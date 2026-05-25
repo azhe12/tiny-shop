@@ -46,6 +46,19 @@ def cancel_order(order_id: str) -> Order:
     return storage.update_order_status(order_id, OrderStatus.CANCELLED)
 
 
+@app.post("/orders/{order_id}/refund", response_model=Order)
+def refund_order(order_id: str) -> Order:
+    order = storage.get_order(order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
+    if order.status not in {OrderStatus.PAID, OrderStatus.SHIPPED}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"cannot refund order in status {order.status.value}",
+        )
+    return storage.update_order_status(order_id, OrderStatus.REFUNDED)
+
+
 @app.post("/coupons", response_model=Coupon)
 def create_coupon(payload: CouponCreate) -> Coupon:
     return storage.create_coupon(payload)
