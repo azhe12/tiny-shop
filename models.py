@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class OrderStatus(str, Enum):
@@ -44,8 +45,30 @@ class Coupon(BaseModel):
     expires_at: datetime | None = None
     is_active: bool = True
 
+    @model_validator(mode="before")
+    @classmethod
+    def accept_discount_percent(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        if data.get("discount") is None and data.get("discount_percent") is not None:
+            return {**data, "discount": data["discount_percent"] / 100}
+        return data
+
 
 class CouponCreate(BaseModel):
     code: str
-    discount: float
+    discount: float | None = None
+    discount_percent: float | None = None
     expires_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def require_discount(self) -> "CouponCreate":
+        if self.discount is None and self.discount_percent is None:
+            raise ValueError("discount or discount_percent is required")
+        return self
+
+    def normalized_discount(self) -> float:
+        if self.discount_percent is not None:
+            return self.discount_percent / 100
+        assert self.discount is not None
+        return self.discount
