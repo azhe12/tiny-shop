@@ -140,5 +140,6 @@ def test_get_coupon_returns_created_one():
 
 
 def test_get_coupon_404_when_missing():
-    resp = client.get("/coupons/NOPE-DOES-NOT-EXIST")
+    resp = client.get("/coupons/DOES-NOT-EXIST")
     assert resp.status_code == 404
+    assert resp.json() == {"detail": "coupon not found"}
