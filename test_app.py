@@ -246,3 +246,51 @@ def test_get_coupon_returns_created_one():
 def test_get_coupon_404_when_missing():
     resp = client.get("/coupons/NOPE-DOES-NOT-EXIST")
     assert resp.status_code == 404
+
+
+def test_delete_coupon_removes_existing_coupon():
+    client.post("/coupons", json={"code": "DELETE-ME", "discount_percent": 15})
+
+    resp = client.delete("/coupons/DELETE-ME")
+
+    assert resp.status_code == 204
+    assert resp.content == b""
+    assert "DELETE-ME" not in storage._coupons
+
+
+def test_get_deleted_coupon_returns_404():
+    client.post("/coupons", json={"code": "DELETE-GET-404", "discount_percent": 25})
+    deleted = client.delete("/coupons/DELETE-GET-404")
+    assert deleted.status_code == 204
+
+    resp = client.get("/coupons/DELETE-GET-404")
+
+    assert resp.status_code == 404
+    assert resp.json() == {"detail": "coupon not found"}
+
+
+def test_delete_missing_coupon_returns_404():
+    resp = client.delete("/coupons/NOPE-DELETE")
+
+    assert resp.status_code == 404
+    assert resp.json() == {"detail": "coupon not found"}
+
+
+def test_delete_coupon_keeps_historical_order_coupon_code():
+    client.post("/coupons", json={"code": "ORDER-HISTORY", "discount_percent": 30})
+    order = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-coupon-history",
+            "items": [{"sku": "G", "qty": 1, "price": 40.0}],
+            "amount": 40.0,
+            "coupon_code": "ORDER-HISTORY",
+        },
+    ).json()
+
+    deleted = client.delete("/coupons/ORDER-HISTORY")
+    resp = client.get(f"/orders/{order['id']}")
+
+    assert deleted.status_code == 204
+    assert resp.status_code == 200
+    assert resp.json()["coupon_code"] == "ORDER-HISTORY"
