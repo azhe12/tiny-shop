@@ -6,12 +6,22 @@ fix via Linear tickets.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import FastAPI, Header, HTTPException
 
 import storage
 from models import Coupon, CouponCreate, Order, OrderCreate, OrderStatus
 
 app = FastAPI(title="tiny-shop", version="0.1.0")
+
+COUPON_EXPIRES_AT_FUTURE_DETAIL = "coupon expires_at must be in the future"
+
+
+def _as_utc_naive(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 @app.post("/orders", response_model=Order)
@@ -48,6 +58,11 @@ def cancel_order(order_id: str) -> Order:
 
 @app.post("/coupons", response_model=Coupon)
 def create_coupon(payload: CouponCreate) -> Coupon:
+    if (
+        payload.expires_at is not None
+        and _as_utc_naive(payload.expires_at) <= datetime.utcnow()
+    ):
+        raise HTTPException(status_code=400, detail=COUPON_EXPIRES_AT_FUTURE_DETAIL)
     return storage.create_coupon(payload)
 
 

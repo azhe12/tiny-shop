@@ -210,6 +210,39 @@ def test_create_coupon_happy_path():
     assert body["is_active"] is True
 
 
+def test_create_coupon_rejects_past_expires_at():
+    resp = client.post(
+        "/coupons",
+        json={
+            "code": "EXPIRED",
+            "discount_percent": 10,
+            "expires_at": (datetime.utcnow() - timedelta(days=1)).isoformat(),
+        },
+    )
+
+    assert resp.status_code == 400
+    assert resp.json() == {"detail": "coupon expires_at must be in the future"}
+    assert storage.get_coupon("EXPIRED") is None
+
+
+def test_create_coupon_accepts_near_future_expires_at():
+    expires_at = datetime.utcnow() + timedelta(seconds=1)
+
+    resp = client.post(
+        "/coupons",
+        json={
+            "code": "FLASH1",
+            "discount_percent": 15,
+            "expires_at": expires_at.isoformat(),
+        },
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["code"] == "FLASH1"
+    assert body["discount_percent"] == 15
+
+
 def test_create_coupon_rejects_discount_percent_below_minimum():
     resp = client.post("/coupons", json={"code": "SAVE0", "discount_percent": 0})
 
