@@ -30,6 +30,31 @@ def test_create_order_happy_path():
     assert body["amount"] == 19.8
     assert body["status"] == "PENDING"
     assert body["id"].startswith("ord-")
+    assert body["remark"] is None
+
+
+def test_create_order_preserves_remark_in_response_and_storage():
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-remark",
+            "items": [{"sku": "NOTE", "qty": 1, "price": 12.5}],
+            "amount": 12.5,
+            "remark": "Leave at the front desk",
+        },
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["remark"] == "Leave at the front desk"
+
+    stored = storage.get_order(body["id"])
+    assert stored is not None
+    assert stored.remark == "Leave at the front desk"
+
+    fetched = client.get(f"/orders/{body['id']}")
+    assert fetched.status_code == 200
+    assert fetched.json()["remark"] == "Leave at the front desk"
 
 
 def test_create_order_rejects_negative_amount():

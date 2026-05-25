@@ -29,3 +29,9 @@ uvicorn app:app --reload
 ```
 
 Then open <http://localhost:8000/docs> for the auto-generated Swagger UI.
+
+## Order remarks
+
+`POST /orders` accepts an optional `remark` string. When provided, the remark is
+stored with the order and returned from both `POST /orders` and
+`GET /orders/{order_id}`.

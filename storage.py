@@ -24,6 +24,7 @@ def create_order(payload: OrderCreate, idempotency_key: str | None = None) -> Or
         items=payload.items,
         amount=payload.amount,
         coupon_code=payload.coupon_code,
+        remark=payload.remark,
         created_at=datetime.utcnow(),
     )
     _orders[order_id] = order
