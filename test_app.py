@@ -15,6 +15,13 @@ from models import OrderStatus
 client = TestClient(app)
 
 
+def test_health_returns_ok():
+    resp = client.get("/health")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
+
+
 def test_create_order_happy_path():
     resp = client.post(
         "/orders",
