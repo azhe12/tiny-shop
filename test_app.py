@@ -32,6 +32,37 @@ def test_create_order_happy_path():
     assert body["id"].startswith("ord-")
 
 
+def test_create_order_rejects_empty_items():
+    before_count = len(storage._orders)
+
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-empty-items",
+            "items": [],
+            "amount": 19.8,
+        },
+    )
+
+    assert 400 <= resp.status_code < 500
+    assert len(storage._orders) == before_count
+
+
+def test_create_order_rejects_missing_items():
+    before_count = len(storage._orders)
+
+    resp = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-missing-items",
+            "amount": 19.8,
+        },
+    )
+
+    assert 400 <= resp.status_code < 500
+    assert len(storage._orders) == before_count
+
+
 def test_create_order_rejects_negative_amount():
     resp = client.post(
         "/orders",
