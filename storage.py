@@ -22,7 +22,7 @@ def create_order(payload: OrderCreate, idempotency_key: str | None = None) -> Or
         id=order_id,
         customer_id=payload.customer_id,
         items=payload.items,
-        amount=payload.amount,
+        amount=round(payload.amount, 2),
         coupon_code=payload.coupon_code,
         created_at=datetime.utcnow(),
     )
@@ -46,6 +46,7 @@ def list_orders(customer_id: str | None = None) -> list[Order]:
 def update_order_status(order_id: str, status: OrderStatus) -> Order:
     order = _orders[order_id]
     order.status = status
+    order.amount = round(order.amount, 2)
     _orders[order_id] = order
     return order
 
