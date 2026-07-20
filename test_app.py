@@ -228,6 +228,101 @@ def test_cancel_cancelled_order_returns_400():
     assert resp.json()["detail"] == "cannot cancel order in status CANCELLED"
 
 
+def test_refund_paid_order_succeeds():
+    created = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-007",
+            "items": [{"sku": "G", "qty": 1, "price": 60.0}],
+            "amount": 60.0,
+        },
+    ).json()
+    storage.update_order_status(created["id"], OrderStatus.PAID)
+
+    resp = client.post(f"/orders/{created['id']}/refund")
+
+    assert resp.status_code == 200
+    assert resp.json()["id"] == created["id"]
+    assert resp.json()["status"] == "REFUNDED"
+
+
+def test_refund_shipped_order_succeeds():
+    created = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-008",
+            "items": [{"sku": "H", "qty": 1, "price": 20.0}],
+            "amount": 20.0,
+        },
+    ).json()
+    storage.update_order_status(created["id"], OrderStatus.SHIPPED)
+
+    resp = client.post(f"/orders/{created['id']}/refund")
+
+    assert resp.status_code == 200
+    assert resp.json()["id"] == created["id"]
+    assert resp.json()["status"] == "REFUNDED"
+
+
+def test_refund_pending_order_returns_400():
+    created = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-009",
+            "items": [{"sku": "I", "qty": 1, "price": 45.0}],
+            "amount": 45.0,
+        },
+    ).json()
+
+    resp = client.post(f"/orders/{created['id']}/refund")
+
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "cannot refund order in status PENDING"
+
+
+def test_refund_missing_order_returns_404():
+    resp = client.post("/orders/does-not-exist/refund")
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "order not found"
+
+
+def test_refund_refunded_order_returns_400():
+    created = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-010",
+            "items": [{"sku": "J", "qty": 1, "price": 85.0}],
+            "amount": 85.0,
+        },
+    ).json()
+    storage.update_order_status(created["id"], OrderStatus.PAID)
+    first_refund = client.post(f"/orders/{created['id']}/refund")
+    assert first_refund.status_code == 200
+
+    resp = client.post(f"/orders/{created['id']}/refund")
+
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "cannot refund order in status REFUNDED"
+
+
+def test_cancel_refunded_order_returns_400():
+    created = client.post(
+        "/orders",
+        json={
+            "customer_id": "u-011",
+            "items": [{"sku": "K", "qty": 1, "price": 95.0}],
+            "amount": 95.0,
+        },
+    ).json()
+    storage.update_order_status(created["id"], OrderStatus.REFUNDED)
+
+    resp = client.post(f"/orders/{created['id']}/cancel")
+
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "cannot cancel order in status REFUNDED"
+
+
 def test_create_coupon_happy_path():
     resp = client.post(
         "/coupons",

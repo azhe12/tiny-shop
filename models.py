@@ -13,6 +13,7 @@ class OrderStatus(str, Enum):
     SHIPPED = "SHIPPED"
     DELIVERED = "DELIVERED"
     CANCELLED = "CANCELLED"
+    REFUNDED = "REFUNDED"
 
 
 class OrderItem(BaseModel):
